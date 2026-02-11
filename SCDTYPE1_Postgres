@@ -1,0 +1,57 @@
+
+CREATE SCHEMA IF NOT EXISTS SCDType1;
+-- STEP 1: Create Target Dimension Table (Customer_Dim) 
+CREATE TABLE SCDType1.customer_dim (
+    customerid INT PRIMARY KEY,
+    customername VARCHAR(100),
+    gender CHAR(1),
+    city VARCHAR(100)
+);
+---------------------------------
+/* Insert Initial Records into Target Dimension */
+
+INSERT INTO SCDType1.Customer_Dim 
+  (CustomerID, CustomerName, Gender, City) 
+VALUES (1, 'Ravi Kumar', 'M', 'Hyderabad'), 
+       (2, 'Anjali Sharma', 'F', 'Mumbai'), 
+       (3, 'Suresh Reddy', 'M', 'Chennai'); 
+.................................
+CREATE SCHEMA IF NOT EXISTS SCDType1;
+
+CREATE TABLE SCDType1.customer_stg (
+    customerid INT,
+    customername VARCHAR(100),
+    gender CHAR(1),
+    city VARCHAR(100)
+);
+.................................
+/* Insert Incoming Records into Staging Table */ 
+INSERT INTO SCDType1.Customer_Stg 
+  (CustomerID, CustomerName, Gender, City) 
+VALUES (1, 'Ravi Kumar', 'M', 'Bangalore'), -- City changed 
+       (2, 'Anjali Sharma', 'F', 'Mumbai'), -- No change 
+       (3, 'Suresh Reddy', 'M', 'Chennai'), -- No change 
+       (4, 'Priya Singh', 'F', 'Delhi');    -- New record 
+..................................
+-- STEP 3: Apply SCD Type 1 using MERGE 
+-- - Updates existing records with new values 
+-- - Inserts new records if not present 
+
+MERGE INTO SCDType1.customer_dim AS target
+USING SCDType1.customer_stg AS source
+ON target.customerid = source.customerid
+
+WHEN MATCHED THEN
+    UPDATE SET
+        customername = source.customername,
+        gender = source.gender,
+        city = source.city
+
+WHEN NOT MATCHED THEN
+    INSERT (customerid, customername, gender, city)
+    VALUES (source.customerid, source.customername, source.gender, source.city);
+
+
+-- STEP 4: Final Output Check 
+SELECT * FROM SCDType1.Customer_Dim; 
+SELECT * FROM SCDType1.Customer_Stg;
