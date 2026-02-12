@@ -1,0 +1,85 @@
+CREATE SCHEMA IF NOT EXISTS scdtype2;
+-- Dimension Table (with history)
+CREATE SCHEMA scdtype2;
+
+CREATE TABLE scdtype2.customer_dim (
+    customerkey INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    customerid INT,
+    customername VARCHAR(100),
+    gender CHAR(1),
+    city VARCHAR(100),
+    startdate DATE,
+    enddate DATE,
+    iscurrent BOOLEAN
+);
+
+...................
+-- Staging Table
+CREATE TABLE SCDType2.Customer_Stg (
+    CustomerID INT,
+    CustomerName VARCHAR(100),
+    Gender CHAR(1),
+    City VARCHAR(100)
+);
+..................
+/* insert them into Customer_Dim with 
+		StartDate = Today, 
+		EndDate = NULL, 
+		IsCurrent = True:
+*/
+INSERT INTO scdtype2.customer_dim
+(customerid, customername, gender, city, startdate, enddate, iscurrent)
+SELECT
+    customerid,
+    customername,
+    gender,
+    city,
+    CURRENT_DATE,
+    NULL,
+    TRUE
+FROM scdtype2.customer_stg;
+This(above) is initial setup. Now next day some update happened in staging table. 
+
+
+..........................................................................
+-- truncate table scdtype2.customer_stg;
+
+-- New Data Comes (Some changes + New Record)
+INSERT INTO scdtype2.customer_stg
+(customerid, customername, gender, city)
+VALUES
+    (1, 'Ravi Kumar', 'M', 'Bangalore'),  -- City changed
+    (2, 'Anjali Sharma', 'F', 'Mumbai'),  -- No change
+    (3, 'Suresh Reddy', 'M', 'Chennai'),  -- No change
+    (4, 'Priya Singh', 'F', 'Delhi');     -- New record
+
+...........................................................................
+After updation that need to reflect in dimension table.(history table)
+so, to do that we need to implement. For that
+EXISTING RECORD:- 
+	IsCurrent should change from TRUE TO FALSE (as its not current data)
+	EndDate should change to todays date. (as today is the last day when he lived in that place)
+
+INSERT :- 
+	update for existing record any
+	insert for new record any
+............................................................................
+To implement it:-
+-- Logic to Implement SCD Type 2
+-- Step A: Update expired record
+
+MERGE INTO scdtype2.customer_dim AS dim
+USING scdtype2.customer_stg AS stg
+    ON dim.customerid = stg.customerid
+   AND dim.iscurrent = TRUE
+WHEN MATCHED AND
+     (dim.customername <> stg.customername
+      OR dim.gender <> stg.gender
+      OR dim.city <> stg.city)
+THEN
+		-- expire old record
+    UPDATE
+       SET enddate   = CURRENT_DATE,
+           iscurrent = FALSE;
+
+....................................................
